@@ -20,6 +20,10 @@ app.use(express.urlencoded({
     limit: "16kb"
 }))
 
+app.get('/hello', (req, res) => {
+    res.send('Hello World!');
+});
+
 app.use(express.static("public"))
 app.use(cookieParser())
 
