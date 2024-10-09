@@ -2,7 +2,7 @@
   "name": "formbackend",
   "version": "1.0.0",
   "description": "A backend service for building and managing forms, allowing the creation of dynamic form structures with various question types, and tracking user submissions.",
-  "main": "index.js",
+  "main": "dist/index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "tsc",
