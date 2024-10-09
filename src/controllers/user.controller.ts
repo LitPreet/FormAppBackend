@@ -213,13 +213,13 @@ const loginUser = asyncHandler(async (req: Request, res: Response) => {
         "-password -refreshToken"
     );
     const accessTokenExpiry =
-        parseDuration(process.env.ACCESS_TOKEN_EXPIRY!) || 15 * 60 * 1000; // Default to 15 minutes
+        parseDuration(process.env.ACCESS_TOKEN_EXPIRY!) || 2 * 60 * 60 * 1000; // Default to 15 minutes
     const refreshTokenExpiry =
         parseDuration(process.env.REFRESH_TOKEN_EXPIRY!) || 7 * 24 * 60 * 60 * 1000; // Default to 7 days
 
     const options = {
         httpOnly: true,
-        secure: true,
+        secure: process.env.NODE_ENV === 'production', // Secure cookies in production
         sameSite: true,
     };
     return res
