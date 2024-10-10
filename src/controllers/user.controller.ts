@@ -217,10 +217,14 @@ const loginUser = asyncHandler(async (req: Request, res: Response) => {
     const refreshTokenExpiry =
         parseDuration(process.env.REFRESH_TOKEN_EXPIRY!) || 7 * 24 * 60 * 60 * 1000; // Default to 7 days
 
-    const options = {
+    const options:{
+        httpOnly: boolean;
+        secure: boolean;
+        sameSite: 'lax' | 'strict' | 'none'; // explicitly set one of the valid values
+    } = {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production', // Secure cookies in production
-        sameSite: true,
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
     };
     return res
         .status(200)
