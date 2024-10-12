@@ -38,7 +38,7 @@ const generateAccessAndRefreshToken = async (userId: string) => {
 
 const registerUser = asyncHandler(async (req: Request, res: Response) => {
     const { username, fullName, email, password } = req.body;
-    console.log(req.body, 'hey')
+
     if ([username, fullName, email, password].some((field) => field?.trim() === "")) {
         throw new ApiError(400, "All fields are required")
     }
@@ -511,7 +511,6 @@ const updateForm = asyncHandler(async (req: Request, res: Response) => {
                 )
             );
     } catch (err) {
-        console.error(err);
         return res.status(500).json(new ApiError(500, 'Error Updating form'));
     }
 });
@@ -627,17 +626,15 @@ const getFormByID = async (req: Request, res: Response) => {
 
 const getQuestionByID = async (req: Request, res: Response) => {
     const questionId = req.params;
-    console.log(questionId);
     try {
-        const question = await Question.findById(questionId);
-        console.log(question,'ghj');
+        const question = await Question.findById(questionId)
         if (!question) {
             return res.status(404).json(new ApiError(404, "Question not found"));
         }
 
         return res.status(200).json(new ApiResponse(200, question, "Question fetched successfully"));
     } catch (error) {
-        console.log(error);
+
         return res.status(500).json(new ApiError(500, "Error fetching Question"));
     }
 };
@@ -667,7 +664,6 @@ const submitFormResponse = async (req: Request, res: Response) => {
         await response.save();  // Save the response
         return res.status(200).json(new ApiResponse(200, {}, "Form response submitted successfully"));
     } catch (error) {
-        console.log(error);
         return res.status(500).json({ error: "Error submitting form response" });
     }
 };
@@ -686,24 +682,22 @@ const getFormResponseById = async (req: Request, res: Response) => {
         }
 
         // Step 2: Fetch the form response by formId, not _id
-        const response = await FormResponse.find({formID: formId });
+        const response = await FormResponse.find({ formID: formId });
         if (!response) {
             return res.status(404).json(new ApiError(404, "Form response not found"));
         }
         return res.status(200).json(new ApiResponse(200, response, "Form response fethced successfully"));
     } catch (error) {
-        console.log(error);
         return res.status(500).json({ error: "Error fetching form response" });
     }
 };
 
 const deleteFormResponseById = async (req: Request, res: Response) => {
     const { formId } = req.params;
-    
+
     if (!formId) {
         throw new ApiError(404, 'Form ID not found');
     }
-    console.log(formId,'jk')
     try {
         const form = await Form.findById(formId);
 
@@ -713,7 +707,6 @@ const deleteFormResponseById = async (req: Request, res: Response) => {
 
         // Delete the form response by formId
         const response = await FormResponse.findById(formId);
-        console.log(response,'j')
         // Check the result of the deletion
         if (!response) {
             return res.status(404).json(new ApiError(404, "Form response not found"));
@@ -721,10 +714,9 @@ const deleteFormResponseById = async (req: Request, res: Response) => {
 
         return res.status(200).json(new ApiResponse(200, {}, "Form response deleted successfully"));
     } catch (error) {
-        console.log(error);
         return res.status(500).json({ error: "Error deleting form response" });
     }
 };
 
 
-export { verifyOTP,getQuestionByID,deleteFormResponseById, submitFormResponse, getFormResponseById, registerUser, refreshAccessToken, loginUser, getCurrentUser, sendEmail, createNewForm, addQuestion, getAllForms, getFormByID, updateForm, deleteForm, deleteFormQuestion }
+export { verifyOTP, getQuestionByID, deleteFormResponseById, submitFormResponse, getFormResponseById, registerUser, refreshAccessToken, loginUser, getCurrentUser, sendEmail, createNewForm, addQuestion, getAllForms, getFormByID, updateForm, deleteForm, deleteFormQuestion }
