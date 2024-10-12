@@ -4,13 +4,6 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const transporter = nodemailer.createTransport({
-  //   host: "smtp.hostinger.com",
-  //   secure: true,
-  // auth: {
-  //   user: 'myvizlogic@vizlogicindia.com',
-  //   pass: 'P@ss1234k',
-  // },
-
     host: "smtp-relay.brevo.com",
     port: 587,
     secure: false, // true for 465, false for other ports

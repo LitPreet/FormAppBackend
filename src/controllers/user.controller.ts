@@ -14,6 +14,7 @@ import { DecodedToken } from "../middlewares/auth.middleware";
 import { Form } from "../models/form.model";
 import { Question } from "../models/question.model";
 import { Types } from "mongoose";
+import { FormResponse } from "../models/formResponses.model";
 
 
 const generateAccessAndRefreshToken = async (userId: string) => {
@@ -217,7 +218,7 @@ const loginUser = asyncHandler(async (req: Request, res: Response) => {
     const refreshTokenExpiry =
         parseDuration(process.env.REFRESH_TOKEN_EXPIRY!) || 7 * 24 * 60 * 60 * 1000; // Default to 7 days
 
-    const options:{
+    const options: {
         httpOnly: boolean;
         secure: boolean;
         sameSite: 'lax' | 'strict' | 'none'; // explicitly set one of the valid values
@@ -287,41 +288,149 @@ const sendEmail = asyncHandler(async (req: Request, res: Response) => {
         );
 })
 
+
+
 const createNewForm = asyncHandler(async (req: Request, res: Response) => {
     const userId = req.user?._id;
+    const { formType } = req.body;
+
+    // Step 1: Define default form and questions based on form type
+    let defaultForm = {
+        heading: "Untitled Form",
+        description: "Add a description",
+        questions: [] as Types.ObjectId[], // Start with an empty questions array
+        userId,
+    };
+
+    let defaultQuestions = [];
+
+    switch (formType) {
+        case "party_invite":
+            defaultForm.heading = "Party Invitation";
+            defaultForm.description = "Join us for a fun party!";
+            defaultQuestions = [
+                {
+                    questionText: "Your Name",
+                    questionDescription: "Please enter your name.",
+                    questionType: "paragraph",
+                    options: [],
+                    answerType: "single",
+                    required: true,
+                },
+                {
+                    questionText: "Will you attend?",
+                    questionDescription: "Let us know if you can make it.",
+                    questionType: "mcq",
+                    options: ["Yes", "No", "Maybe"],
+                    answerType: "single",
+                    required: true,
+                },
+            ];
+            break;
+
+        case "contact_form":
+            defaultForm.heading = "Contact Us";
+            defaultForm.description = "We'd love to hear from you!";
+            defaultQuestions = [
+                {
+                    questionText: "Your Name",
+                    questionDescription: "Please enter your name.",
+                    questionType: "paragraph",
+                    options: [],
+                    answerType: "single",
+                    required: true,
+                },
+                {
+                    questionText: "Your Email",
+                    questionDescription: "Please enter your email address.",
+                    questionType: "paragraph",
+                    options: [],
+                    answerType: "single",
+                    required: true,
+                },
+                {
+                    questionText: "Your Message",
+                    questionDescription: "What would you like to say?",
+                    questionType: "paragraph",
+                    options: [],
+                    answerType: "multiple",
+                    required: true,
+                },
+            ];
+            break;
+
+        case "feedback_form": // Suggestion for the third form type
+            defaultForm.heading = "Feedback Form";
+            defaultForm.description = "We appreciate your feedback!";
+            defaultQuestions = [
+                {
+                    questionText: "Rate your experience",
+                    questionDescription: "How would you rate your experience?",
+                    questionType: "mcq",
+                    options: ["1", "2", "3", "4", "5"],
+                    answerType: "single",
+                    required: true,
+                },
+                {
+                    questionText: "What did you like?",
+                    questionDescription: "Please share what you liked.",
+                    questionType: "paragraph",
+                    options: [],
+                    answerType: "single",
+                    required: true,
+                },
+                {
+                    questionText: "What can be improved?",
+                    questionDescription: "Please share your suggestions.",
+                    questionType: "paragraph",
+                    options: [],
+                    answerType: "single",
+                    required: true,
+                },
+            ];
+            break;
+
+        case "blank_form":
+            defaultForm.heading = "Untitled Form";
+            defaultForm.description = "Add a description";
+            defaultQuestions = [
+                {
+                    questionText: "",
+                    questionDescription: "",
+                    questionType: "paragraph",
+                    options: [],
+                    answerType: "single",
+                    required: false
+                },
+                {
+                    questionText: "",
+                    questionDescription: "",
+                    questionType: "mcq",
+                    options: ["Option 1"],
+                    answerType: "single",
+                    required: false
+                },
+            ];
+            break;
+
+        default:
+            return res.status(400).json(new ApiError(400, 'Invalid form type'));
+    }
+
     try {
-        // Step 1: Create the form with empty questions array
-        const defaultForm = {
-            heading: "Untitled Form",
-            description: "Add a description",
-            questions: [] as Types.ObjectId[],  // Start with an empty questions array
-            userId
-        };
+        // Step 2: Create and save the form
         const form = new Form(defaultForm);
-        await form.save();
+        await form.save(); // Save the form to get the _id
 
-        // Step 2: Define default questions
-        const defaultQuestions = [
-            {
-                form: form._id,
-                questionText: "",
-                questionDescription: "",
-                questionType: "paragraph",
-                options: [],
-                required: false
-            },
-            {
-                form: form._id,
-                questionText: "",
-                questionDescription: "",
-                questionType: "mcq",
-                options: ["Option 1"],
-                required: false
-            }
-        ];
+        // Step 3: Create question documents with the saved form's ID
+        const createdQuestions = await Question.insertMany(
+            defaultQuestions.map((question) => ({
+                ...question,
+                form: form._id, // Assign the created form's ID to each question
+            }))
+        );
 
-        // Step 3: Create question documents and add their IDs to the form
-        const createdQuestions = await Question.insertMany(defaultQuestions);
+
         form.questions = createdQuestions.map((question) => question._id as Types.ObjectId);
         await form.save();
 
@@ -330,7 +439,7 @@ const createNewForm = asyncHandler(async (req: Request, res: Response) => {
             formId: form._id,
             heading: form.heading,
             description: form.description,
-            questions: createdQuestions // Return full question details here
+            questions: createdQuestions, // Return full question details here
         };
 
         return res
@@ -339,7 +448,7 @@ const createNewForm = asyncHandler(async (req: Request, res: Response) => {
                 new ApiResponse(
                     200,
                     {
-                        response
+                        response,
                     },
                     "Form created successfully"
                 )
@@ -349,14 +458,13 @@ const createNewForm = asyncHandler(async (req: Request, res: Response) => {
     }
 });
 
+
 const updateForm = asyncHandler(async (req: Request, res: Response) => {
     const { formId } = req.params;
     const { heading, description, questions } = req.body;
     if (!formId || !heading || !description || !Array.isArray(questions)) {
         throw new ApiError(400, "All fields are required, Some fields are missing.");
     }
-    console.log({heading, description, questions, formId})
-    console.log(questions.map(t => t.options))
     try {
         //step 1 to find the form
         const form = await Form.findById(formId).populate('questions')
@@ -368,46 +476,27 @@ const updateForm = asyncHandler(async (req: Request, res: Response) => {
         form.heading = heading;
         form.description = description;
 
-        // Step 3: Update or add new questions
-        // if (questions && questions.length > 0) {
-        //     for (const updatedQuestion of questions) {
-        //         if (updatedQuestion._id && updatedQuestion.form) {
-        //             await Question.findByIdAndUpdate(updatedQuestion._id, {
-        //                 questionText: updatedQuestion.questionText,
-        //                 questionDescription: updatedQuestion.questionDescription,
-        //                 questionType: updatedQuestion.questionType,
-        //                 options: updatedQuestion.options,
-        //                 required: updatedQuestion.required,
-        //                 form: updatedQuestion.form
-        //             })
-        //             await form.save();
-        //         }
-        //         else {
-        //             throw new ApiError(404, 'Question not found')
-        //         }
-        //     }
-        // } if (questions && questions.length > 0) {
-            for (const updatedQuestion of questions) {
-                if (updatedQuestion._id) {
-                    const updatedData = {
-                        questionText: updatedQuestion.questionText,
-                        questionDescription: updatedQuestion.questionDescription,
-                        questionType: updatedQuestion.questionType,
-                        options: updatedQuestion.options,
-                        required: updatedQuestion.required,
-                        form: formId // Ensure that the form ID is set correctly
-                    };
+        for (const updatedQuestion of questions) {
+            if (updatedQuestion._id) {
+                const updatedData = {
+                    questionText: updatedQuestion.questionText,
+                    questionDescription: updatedQuestion.questionDescription,
+                    options: updatedQuestion.options,
+                    answerType: updatedQuestion.answerType,
+                    required: updatedQuestion.required,
+                    form: formId // Ensure that the form ID is set correctly
+                };
 
-                    // Update the question by ID
-                    const questionUpdate = await Question.findByIdAndUpdate(updatedQuestion._id, updatedData, { new: true });
-                    if (!questionUpdate) {
-                        throw new ApiError(404, 'Question not found');
-                    }
-                } else {
-                    throw new ApiError(400, 'Question ID is required');
+                // Update the question by ID
+                const questionUpdate = await Question.findByIdAndUpdate(updatedQuestion._id, updatedData, { new: true });
+                if (!questionUpdate) {
+                    throw new ApiError(404, 'Question not found');
                 }
+            } else {
+                throw new ApiError(400, 'Question ID is required');
             }
-            await form.save();
+        }
+        await form.save();
         const updatedForm = await Form.findById(formId).populate('questions');
 
         return res
@@ -486,9 +575,9 @@ const deleteFormQuestion = asyncHandler(async (req: Request, res: Response) => {
         // Get the form ID associated with the question
         const formId = question.form;
 
- // Delete the question
+        // Delete the question
         await Question.findByIdAndDelete(questionId);
-        
+
         // Remove the question from the form's questions array
         await Form.findByIdAndUpdate(formId, { $pull: { questions: questionId } });
 
@@ -504,7 +593,6 @@ const getAllForms = async (req: Request, res: Response) => {
     const userId = req.user?._id;
 
     try {
-        // const forms = await Form.find({ userId: userId }).populate("questions");
         const forms = await Form.find({ userId: userId })
             .select("heading description createdAt")  // Select only the fields needed
             .populate({
@@ -513,7 +601,7 @@ const getAllForms = async (req: Request, res: Response) => {
             })
             .lean();  // Convert to plain JavaScript objects
 
-        // Add question count manually
+
         const formsWithQuestionCount = forms.map((form) => ({
             ...form,
             questionsCount: form.questions.length,
@@ -537,4 +625,106 @@ const getFormByID = async (req: Request, res: Response) => {
     }
 };
 
-export { verifyOTP, registerUser, refreshAccessToken, loginUser, getCurrentUser, sendEmail, createNewForm, addQuestion, getAllForms, getFormByID, updateForm, deleteForm, deleteFormQuestion }
+const getQuestionByID = async (req: Request, res: Response) => {
+    const questionId = req.params;
+    console.log(questionId);
+    try {
+        const question = await Question.findById(questionId);
+        console.log(question,'ghj');
+        if (!question) {
+            return res.status(404).json(new ApiError(404, "Question not found"));
+        }
+
+        return res.status(200).json(new ApiResponse(200, question, "Question fetched successfully"));
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json(new ApiError(500, "Error fetching Question"));
+    }
+};
+
+// Route to handle form submission
+const submitFormResponse = async (req: Request, res: Response) => {
+    const { formId } = req.params;
+    const { answers } = req.body;
+    if (!formId) {
+        throw new ApiError(404, 'form ID not found')
+    }
+    if (!answers || answers.length === 0) {
+        return res.status(400).json(new ApiError(400, "Answers are required")); // Bad Request
+    }
+    try {
+        const form = await Form.findById(formId);
+
+        if (!form) {
+            return res.status(404).json(new ApiError(404, "Form not found"));
+        }
+        // Create a new response document
+        const response = new FormResponse({
+            formID: formId,
+            answers: answers
+        });
+
+        await response.save();  // Save the response
+        return res.status(200).json(new ApiResponse(200, {}, "Form response submitted successfully"));
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({ error: "Error submitting form response" });
+    }
+};
+
+const getFormResponseById = async (req: Request, res: Response) => {
+    const { formId } = req.params;
+    if (!formId) {
+        throw new ApiError(404, 'form ID not found')
+    }
+
+    try {
+        const form = await Form.findById(formId);
+
+        if (!form) {
+            return res.status(404).json(new ApiError(404, "Form not found"));
+        }
+
+        // Step 2: Fetch the form response by formId, not _id
+        const response = await FormResponse.find({formID: formId });
+        if (!response) {
+            return res.status(404).json(new ApiError(404, "Form response not found"));
+        }
+        return res.status(200).json(new ApiResponse(200, response, "Form response fethced successfully"));
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({ error: "Error fetching form response" });
+    }
+};
+
+const deleteFormResponseById = async (req: Request, res: Response) => {
+    const { formId } = req.params;
+    
+    if (!formId) {
+        throw new ApiError(404, 'Form ID not found');
+    }
+    console.log(formId,'jk')
+    try {
+        const form = await Form.findById(formId);
+
+        if (!form) {
+            return res.status(404).json(new ApiError(404, "Form not found"));
+        }
+
+        // Delete the form response by formId
+        const response = await FormResponse.findById(formId);
+        console.log(response,'j')
+        // Check the result of the deletion
+        if (!response) {
+            return res.status(404).json(new ApiError(404, "Form response not found"));
+        }
+
+        return res.status(200).json(new ApiResponse(200, {}, "Form response deleted successfully"));
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({ error: "Error deleting form response" });
+    }
+};
+
+
+export { verifyOTP,getQuestionByID,deleteFormResponseById, submitFormResponse, getFormResponseById, registerUser, refreshAccessToken, loginUser, getCurrentUser, sendEmail, createNewForm, addQuestion, getAllForms, getFormByID, updateForm, deleteForm, deleteFormQuestion }

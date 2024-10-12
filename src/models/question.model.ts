@@ -7,6 +7,7 @@ interface IQuestion extends Document {
     options?: string[];    // For MCQ, checkbox, and dropdown (optional, required only for these types)
     required: boolean;     // Whether the question is mandatory
     questionDescription?:string; // The description for the question
+    answerType: 'single' | 'multiple';
 }
 
 const questionSchema = new Schema<IQuestion>({
@@ -34,6 +35,11 @@ const questionSchema = new Schema<IQuestion>({
     required: {
         type: Boolean,
         default: false  // Not mandatory by default
+    },
+    answerType: {
+        type: String,
+        enum: ['single', 'multiple'], // Allowed answer types
+        required: true, // Specify if this is mandatory
     }
 }, { timestamps: true });
 

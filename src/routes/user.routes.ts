@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { addQuestion, createNewForm, deleteForm, deleteFormQuestion, getAllForms, getCurrentUser, getFormByID, loginUser, refreshAccessToken, registerUser,  sendEmail,  updateForm,  verifyOTP } from "../controllers/user.controller";
+import { addQuestion, createNewForm, deleteForm, deleteFormQuestion, deleteFormResponseById, getAllForms, getCurrentUser, getFormByID, getFormResponseById, getQuestionByID, loginUser, refreshAccessToken, registerUser,  sendEmail,  submitFormResponse,  updateForm,  verifyOTP } from "../controllers/user.controller";
 import { upload } from "../middlewares/multer.middleware";
 import { verifyJWT } from "../middlewares/auth.middleware";
 
@@ -21,6 +21,11 @@ router.route("/delete-form/:formId").post(verifyJWT, deleteForm)
 router.route("/delete-question/:questionId").delete(verifyJWT, deleteFormQuestion)
 router.route("/get-allForms").get(verifyJWT, getAllForms)
 router.route("/get-FormById/:formId").get(verifyJWT, getFormByID)
+router.route("/get-questionById/:questionId").get(verifyJWT, getQuestionByID)
+router.route("/get-FormResponse/:formId").get(verifyJWT, getFormResponseById)
+router.route("/submit-formView/:formId").get(getFormByID);
+router.route("/submission-form/:formId").post(submitFormResponse);
+router.route("/deletform-response/:formId").delete(verifyJWT,deleteFormResponseById);
 
 
 export default router
