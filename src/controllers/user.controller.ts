@@ -13,7 +13,7 @@ import csv from 'csv-parser';
 import { DecodedToken } from "../middlewares/auth.middleware";
 import { Form } from "../models/form.model";
 import { Question } from "../models/question.model";
-import { Types } from "mongoose";
+import mongoose, { Types } from "mongoose";
 import { FormResponse } from "../models/formResponses.model";
 
 
@@ -517,7 +517,7 @@ const updateForm = asyncHandler(async (req: Request, res: Response) => {
 
 
 const addQuestion = asyncHandler(async (req: Request, res: Response) => {
-    const { formId, questionType } = req.body;
+    const { formId, questionType,answerType } = req.body;
 
     // Set default question text if not provided
     const questionText = req.body.questionText?.trim() || " ";
@@ -537,6 +537,7 @@ const addQuestion = asyncHandler(async (req: Request, res: Response) => {
             questionDescription: '',
             questionType,
             options: defaultOptions,
+            answerType: answerType
         });
 
         await newQuestion.save();
@@ -549,20 +550,6 @@ const addQuestion = asyncHandler(async (req: Request, res: Response) => {
     }
 });
 
-
-const deleteForm = asyncHandler(async (req: Request, res: Response) => {
-    const { formId } = req.params;
-    try {
-        const form = await Form.findById(formId);
-        if (!form) {
-            throw new ApiError(404, "Form not found")
-        }
-        await Form.findByIdAndDelete(formId)
-        return res.status(200).json(new ApiResponse(200, {}, 'Successfully form deleted'))
-    } catch (error: any) {
-        return res.status(500).json(new ApiError(500, "Error deleting form"));
-    }
-})
 
 const deleteFormQuestion = asyncHandler(async (req: Request, res: Response) => {
     const { questionId } = req.params;
@@ -600,16 +587,23 @@ const getAllForms = async (req: Request, res: Response) => {
             })
             .lean();  // Convert to plain JavaScript objects
 
+            const formsWithSubmissionCount = await Promise.all(forms.map(async (form) => {
+                // Count submissions for each form
+                const submissionCount = await FormResponse.countDocuments({ formID: form._id });
+    
+                return {
+                    ...form,
+                    questionsCount: form.questions.length,
+                    submissionCount,  // Add submission count
+                };
+            }));
 
-        const formsWithQuestionCount = forms.map((form) => ({
-            ...form,
-            questionsCount: form.questions.length,
-        }));
-        return res.status(200).json(new ApiResponse(200, formsWithQuestionCount, "Forms fetched successfully"));
+        return res.status(200).json(new ApiResponse(200, formsWithSubmissionCount, "Forms fetched successfully"));
     } catch (error) {
         return res.status(500).json(new ApiError(500, "Error fetching forms"));
     }
 };
+
 const getFormByID = async (req: Request, res: Response) => {
     const formId = req.params;
     try {
@@ -676,7 +670,6 @@ const getFormResponseById = async (req: Request, res: Response) => {
 
     try {
         const form = await Form.findById(formId);
-
         if (!form) {
             return res.status(404).json(new ApiError(404, "Form not found"));
         }
@@ -694,20 +687,18 @@ const getFormResponseById = async (req: Request, res: Response) => {
 
 const deleteFormResponseById = async (req: Request, res: Response) => {
     const { formId } = req.params;
-
     if (!formId) {
         throw new ApiError(404, 'Form ID not found');
     }
     try {
         const form = await Form.findById(formId);
-
         if (!form) {
             return res.status(404).json(new ApiError(404, "Form not found"));
         }
 
         // Delete the form response by formId
-        const response = await FormResponse.findById(formId);
-        // Check the result of the deletion
+        const response = await FormResponse.findOneAndDelete({ formID: formId });
+
         if (!response) {
             return res.status(404).json(new ApiError(404, "Form response not found"));
         }
@@ -718,5 +709,52 @@ const deleteFormResponseById = async (req: Request, res: Response) => {
     }
 };
 
+const deleteForm = asyncHandler(async (req: Request, res: Response) => {
+    const { formId } = req.params;
+    const userId = req.user?.id; 
 
-export { verifyOTP, getQuestionByID, deleteFormResponseById, submitFormResponse, getFormResponseById, registerUser, refreshAccessToken, loginUser, getCurrentUser, sendEmail, createNewForm, addQuestion, getAllForms, getFormByID, updateForm, deleteForm, deleteFormQuestion }
+    try {
+        // Find the form by ID
+        const form = await Form.findById(formId);
+        if (!form) {
+            throw new ApiError(404, "Form not found");
+        }
+
+        // Check if the user is the creator of the form
+        const isFormCreator = form.userId.equals(userId); 
+        if (isFormCreator) {
+            await Form.findByIdAndDelete(formId);
+            return res.status(200).json(new ApiResponse(200, {}, 'Form deleted successfully'));
+        } else {
+            return res.status(403).json(new ApiError(403, "You are not authorized to delete this form"));
+        }
+    } catch (error: any) {
+        // Catch any errors and return a 500 Internal Server Error response
+        return res.status(500).json(new ApiError(500, "Error deleting form"));
+    }
+});
+
+
+const sendFormUrlMail = asyncHandler(async (req: Request, res: Response) => {
+    const {url, recipientEmail } = req.body; 
+
+    if (!recipientEmail || !url) {
+        return res.status(400).json(new ApiError(400, "Recipient email and form URL are required."));
+    }
+
+    try {
+        await sendMail({
+            email: recipientEmail,
+            subject: "You've been invited to fill out a form!",
+            text: `Hello,\n\nYou have been invited to submit a form. You can access it using the following link:\n\n${url}\n\nBest regards,\nFormiverse`
+        });
+
+        return res.status(200).json({ message: "Email sent successfully!" }); // Successful response
+    } catch (error: any) {
+        // Catch any errors and return a 500 Internal Server Error response
+        return res.status(500).json(new ApiError(500, "Error sending email: " + error.message));
+    }
+});
+
+
+export { verifyOTP,sendFormUrlMail, getQuestionByID, deleteFormResponseById, submitFormResponse, getFormResponseById, registerUser, refreshAccessToken, loginUser, getCurrentUser, sendEmail, createNewForm, addQuestion, getAllForms, getFormByID, updateForm, deleteForm, deleteFormQuestion }
