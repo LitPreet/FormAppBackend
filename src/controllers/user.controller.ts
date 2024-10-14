@@ -518,12 +518,12 @@ const updateForm = asyncHandler(async (req: Request, res: Response) => {
 
 const addQuestion = asyncHandler(async (req: Request, res: Response) => {
     const { formId, questionType,answerType } = req.body;
-
+console.log({formId, questionType,answerType },'checking issues')
     // Set default question text if not provided
     const questionText = req.body.questionText?.trim() || " ";
 
     // Validate required fields
-    if ([formId, questionType].some((value) => value === "")) {
+    if ([formId, questionType,answerType].some((value) => value === "")) {
         throw new ApiError(400, "Form ID and question type are required");
     }
     // Define default options
