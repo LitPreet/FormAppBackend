@@ -687,7 +687,7 @@ const getAllForms = async (req: Request, res: Response) => {
 const getFormByID = async (req: Request, res: Response) => {
     const formId = req.params;
     try {
-        const form = await Form.findById(formId).populate("questions");
+        const form = await Form.findById(formId.formId).populate("questions");
         console.log(form,formId,'yeah')
         if (!form) {
             return res.status(404).json(new ApiError(404, "Form not found"));
