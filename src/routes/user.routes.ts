@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { addQuestion, createNewForm, deleteForm, deleteFormQuestion, deleteFormResponseById, getAllForms, getCurrentUser, getFormByID, getFormResponseById, getQuestionByID, loginUser, refreshAccessToken, registerUser,  sendEmail,  sendFormUrlMail,  sendPasswordResetOTP,  submitFormResponse,  updateForm,  verifyOTP, verifyOtpAndChangePassword } from "../controllers/user.controller";
+import { addQuestion, checkAuth, createNewForm, deleteForm, deleteFormQuestion, deleteFormResponseById, getAllForms, getCurrentUser, getFormByID, getFormResponseById, getQuestionByID, loginUser, refreshAccessToken, registerUser,  sendEmail,  sendFormUrlMail,  sendPasswordResetOTP,  submitFormResponse,  updateForm,  verifyOTP, verifyOtpAndChangePassword } from "../controllers/user.controller";
 import { verifyJWT } from "../middlewares/auth.middleware";
 
 const router = Router()
@@ -14,6 +14,7 @@ router.route("/send-email").post(sendEmail)
 router.route("/refresh-token").post(refreshAccessToken);
 
 //secured routes
+router.route('/check-auth').get(verifyJWT,checkAuth);
 router.route("/current-user").get(verifyJWT, getCurrentUser)
 router.route("/create-form").post(verifyJWT, createNewForm)
 router.route("/update-form/:formId").put(verifyJWT,updateForm)

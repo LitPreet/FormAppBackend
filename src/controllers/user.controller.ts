@@ -250,6 +250,15 @@ const loginUser = asyncHandler(async (req: Request, res: Response) => {
         );
 })
 
+const checkAuth = asyncHandler(async (req: Request, res: Response) => {
+    const user = req.user; // Assuming you attach user data after token verification
+    if (!user) {
+        return res.status(401).json(new ApiResponse(401, {}, "Unauthorized"));
+    }
+    res.status(200).json(new ApiResponse(200, { user }, "User is authenticated"));
+});
+
+
 const changePassword = asyncHandler(async (req: Request, res: Response) => {
     const { oldPassword, newPassword, email } = req.body;
 
@@ -828,4 +837,4 @@ const sendFormUrlMail = asyncHandler(async (req: Request, res: Response) => {
 });
 
 
-export { verifyOTP, sendPasswordResetOTP, verifyOtpAndChangePassword, sendFormUrlMail, getQuestionByID, deleteFormResponseById, submitFormResponse, getFormResponseById, registerUser, refreshAccessToken, loginUser, getCurrentUser, sendEmail, createNewForm, addQuestion, getAllForms, getFormByID, updateForm, deleteForm, deleteFormQuestion }
+export { verifyOTP,checkAuth, sendPasswordResetOTP, verifyOtpAndChangePassword, sendFormUrlMail, getQuestionByID, deleteFormResponseById, submitFormResponse, getFormResponseById, registerUser, refreshAccessToken, loginUser, getCurrentUser, sendEmail, createNewForm, addQuestion, getAllForms, getFormByID, updateForm, deleteForm, deleteFormQuestion }
