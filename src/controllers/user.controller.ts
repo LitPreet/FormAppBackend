@@ -687,13 +687,15 @@ const getAllForms = async (req: Request, res: Response) => {
 const getFormByID = async (req: Request, res: Response) => {
     const formId = req.params;
     try {
-        const form = await Form.findById(formId.formId).populate("questions");
+        const form = await Form.findById(formId).populate("questions");
+        console.log(form,formId,'yeah')
         if (!form) {
             return res.status(404).json(new ApiError(404, "Form not found"));
         }
 
         return res.status(200).json(new ApiResponse(200, form, "Form fetched successfully"));
     } catch (error) {
+        console.log(error,'he');
         return res.status(500).json(new ApiError(500, "Error fetching forms"));
     }
 };
