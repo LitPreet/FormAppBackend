@@ -671,7 +671,7 @@ const getAllForms = async (req: Request, res: Response) => {
 
         return res.status(200).json(new ApiResponse(200, formsWithSubmissionCount, "Forms fetched successfully"));
     } catch (error) {
-        return res.status(500).json(new ApiError(500, "Error fetching forms"));
+        return res.status(500).json(new ApiResponse(500,{}, "Error fetching forms"));
     }
 };
 
