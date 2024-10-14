@@ -40,13 +40,14 @@ const registerUser = asyncHandler(async (req: Request, res: Response) => {
     const { username, fullName, email, password } = req.body;
 
     if ([username, fullName, email, password].some((field) => field?.trim() === "")) {
-        throw new ApiError(400, "All fields are required")
+        return res.status(400).send(new ApiResponse(400, {}, "All fields are required"))
+
     }
     const existedUser = await User.findOne({
         $or: [{ username }, { email }]
     })
     if (existedUser) {
-        throw new ApiError(409, "User with this email and username already exists");
+        return res.status(409).send(new ApiResponse(409, {}, "User with this email and username already exists"))
     }
 
     const otp = generateOTP()
@@ -141,11 +142,11 @@ const getCurrentUser = asyncHandler(async (req, res) => {
 const verifyOTP = asyncHandler(async (req: Request, res: Response) => {
     const { email, otp } = req.body;
     if (!(email || otp)) {
-        throw new ApiError(400, "email and otp required");
+        return res.status(400).send(new ApiResponse(400, {}, "email and otp required"))
     }
     const tempUser = await TemporaryUser.findOne({ email: email });
     if (!tempUser || tempUser.expiresAt.getTime() < Date.now()) {
-        throw new ApiError(400, "Invalid or expired otp");
+        return res.status(400).send(new ApiResponse(400, {}, "Invalid or expired otp"))
     }
     const user = await User.create({
         fullName: tempUser.fullName,
@@ -157,7 +158,7 @@ const verifyOTP = asyncHandler(async (req: Request, res: Response) => {
     const { accessToken, refreshToken } = await generateAccessAndRefreshToken(user?._id as string)
 
     if (!accessToken || !refreshToken) {
-        throw new ApiError(500, "Failed to generate tokens");
+        return res.status(500).send(new ApiResponse(500, {}, "Something went wrong while registering the user"))
     }
     const createdUser = await User.findById(user._id).select(
         "-password -refreshToken"
@@ -165,7 +166,7 @@ const verifyOTP = asyncHandler(async (req: Request, res: Response) => {
     // Clean up the temporary user record and OTP
     await TemporaryUser.deleteOne({ email, otp });
     if (!createdUser) {
-        throw new ApiError(500, "Something went wrong while registering the user");
+        return res.status(500).send(new ApiResponse(500, {}, "Something went wrong while registering the user"))
     }
     const accessTokenExpiry =
         parseDuration(process.env.ACCESS_TOKEN_EXPIRY!) || 15 * 60 * 1000; // Default to 15 minutes
@@ -201,11 +202,11 @@ const loginUser = asyncHandler(async (req: Request, res: Response) => {
         $or: [{ username }, { email }],
     });
     if (!user) {
-        throw new ApiError(404, "User does not exist");
+        return res.status(404).send(new ApiResponse(404, {}, "User does not exist"))
     }
     const isPasswordValid = await user.isPasswordCorrect(password);
     if (!isPasswordValid) {
-        throw new ApiError(401, "Invalid user credentials");
+        return res.status(401).send(new ApiResponse(404, {}, "Invalid user credentials"))
     }
     const { accessToken, refreshToken } = await generateAccessAndRefreshToken(
         user._id as string
@@ -267,6 +268,75 @@ const changePassword = asyncHandler(async (req: Request, res: Response) => {
         .status(200)
         .json(new ApiResponse(200, {}, "Password changed successfully"));
 })
+
+
+const sendPasswordResetOTP = asyncHandler(async (req: Request, res: Response) => {
+    const { email } = req.body;
+    if (email === "johndoe@gmail.com") {
+        return res.status(403).json(new ApiResponse(403, {}, "Guest users cannot change their password."));
+    }
+    // Check if the user exists
+    const user = await User.findOne({ email });
+    if (!user) {
+        return res.status(404).send(new ApiResponse(404, {}, "User with this email not found."));
+    }
+    try {
+        const otp = generateOTP();
+        const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+        // Store the OTP and expiration in the user's document
+        user.resetPasswordOTP = otp;
+        user.otpExpires = expiresAt;
+
+        await user.save({ validateBeforeSave: false });
+
+        // Send OTP via email (pseudo code, you need to integrate email service)
+        await sendMail({ email, subject: "Your Password Reset OTP", text: `Your OTP is ${otp}` });
+
+        return res.status(200).json(new ApiResponse(200, {}, "OTP has been successfully sent to your email."));
+    } catch (error) {
+        return res.status(500).json(new ApiResponse(500, {}, "We encountered an issue while sending the OTP. Please try again later."));
+    }
+});
+
+const verifyOtpAndChangePassword = asyncHandler(async (req: Request, res: Response) => {
+    const { email, otp, newPassword } = req.body;
+
+    // Check for required fields
+    if ([email, otp, newPassword].some((field) => field?.trim() === "")) {
+        return res.status(400).send(new ApiResponse(400, {}, "All fields are required"));
+    }
+
+    try {
+        // Find the user by email
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(404).send(new ApiResponse(404, {}, "User not found"));
+        }
+
+        // Check if OTP is valid and not expired
+        if (!user.resetPasswordOTP || user.resetPasswordOTP !== otp || user.otpExpires! < new Date(Date.now())) {
+            return res.status(400).send(new ApiResponse(400, {}, "Invalid or expired OTP"));
+        }
+
+        // Set new password
+        user.password = newPassword;
+
+        // Clear OTP and expiration after successful reset
+        user.resetPasswordOTP = '';
+        user.otpExpires = null;
+
+        await user.save({ validateBeforeSave: false });
+
+        return res.status(200).json(new ApiResponse(200, {}, "Password changed successfully"));
+    } catch (error) {
+        console.error("Error during OTP verification and password change:", error);
+        return res.status(500).json(new ApiResponse(500, {}, "An error occurred while changing the password. Please try again later."));
+    }
+});
+
+
+
 
 const sendEmail = asyncHandler(async (req: Request, res: Response) => {
     const otp = generateOTP()
@@ -454,7 +524,7 @@ const createNewForm = asyncHandler(async (req: Request, res: Response) => {
                 )
             );
     } catch (err) {
-        return res.status(500).json(new ApiError(500, 'Error creating form'));
+        return res.status(500).send(new ApiResponse(500, {}, 'An unexpected error occurred while creating the form. Please try again later or contact support if the issue persists.'));
     }
 });
 
@@ -463,14 +533,14 @@ const updateForm = asyncHandler(async (req: Request, res: Response) => {
     const { formId } = req.params;
     const { heading, description, questions } = req.body;
     if (!formId || !heading || !description || !Array.isArray(questions)) {
-        throw new ApiError(400, "All fields are required, Some fields are missing.");
+        return res.status(400).send(new ApiResponse(400, {}, "All fields are required, Some fields are missing."));
     }
     try {
         //step 1 to find the form
         const form = await Form.findById(formId).populate('questions')
 
         if (!form) {
-            return res.status(404).json(new ApiError(404, 'Form not found'));
+            return res.status(404).json(new ApiResponse(404, {}, 'Form not found'));
         }
 
         form.heading = heading;
@@ -490,10 +560,11 @@ const updateForm = asyncHandler(async (req: Request, res: Response) => {
                 // Update the question by ID
                 const questionUpdate = await Question.findByIdAndUpdate(updatedQuestion._id, updatedData, { new: true });
                 if (!questionUpdate) {
-                    throw new ApiError(404, 'Question not found');
+                    return res.status(404).send(new ApiResponse(404, {}, 'Question not found'));
                 }
             } else {
-                throw new ApiError(400, 'Question ID is required');
+                return res.status(400).send(new ApiResponse(400, {}, 'An unexpected error occurred'));
+
             }
         }
         await form.save();
@@ -511,19 +582,19 @@ const updateForm = asyncHandler(async (req: Request, res: Response) => {
                 )
             );
     } catch (err) {
-        return res.status(500).json(new ApiError(500, 'Error Updating form'));
+        return res.status(500).json(new ApiResponse(500, {}, 'An unexpected error occured while Updating form'));
     }
 });
 
 
 const addQuestion = asyncHandler(async (req: Request, res: Response) => {
-    const { formId, questionType,answerType } = req.body;
-console.log({formId, questionType,answerType },'checking issues')
+    const { formId, questionType, answerType } = req.body;
+
     // Set default question text if not provided
     const questionText = req.body.questionText?.trim() || " ";
 
     // Validate required fields
-    if ([formId, questionType,answerType].some((value) => value === "")) {
+    if ([formId, questionType, answerType].some((value) => value === "")) {
         throw new ApiError(400, "Form ID and question type are required");
     }
     // Define default options
@@ -587,16 +658,16 @@ const getAllForms = async (req: Request, res: Response) => {
             })
             .lean();  // Convert to plain JavaScript objects
 
-            const formsWithSubmissionCount = await Promise.all(forms.map(async (form) => {
-                // Count submissions for each form
-                const submissionCount = await FormResponse.countDocuments({ formID: form._id });
-    
-                return {
-                    ...form,
-                    questionsCount: form.questions.length,
-                    submissionCount,  // Add submission count
-                };
-            }));
+        const formsWithSubmissionCount = await Promise.all(forms.map(async (form) => {
+            // Count submissions for each form
+            const submissionCount = await FormResponse.countDocuments({ formID: form._id });
+
+            return {
+                ...form,
+                questionsCount: form.questions.length,
+                submissionCount,  // Add submission count
+            };
+        }));
 
         return res.status(200).json(new ApiResponse(200, formsWithSubmissionCount, "Forms fetched successfully"));
     } catch (error) {
@@ -700,7 +771,7 @@ const deleteFormResponseById = async (req: Request, res: Response) => {
         const response = await FormResponse.findOneAndDelete({ formID: formId });
 
         if (!response) {
-            return res.status(404).json(new ApiError(404, "Form response not found"));
+            return res.status(404).json(new ApiResponse(404, {}, "Form response not found"));
         }
 
         return res.status(200).json(new ApiResponse(200, {}, "Form response deleted successfully"));
@@ -711,7 +782,7 @@ const deleteFormResponseById = async (req: Request, res: Response) => {
 
 const deleteForm = asyncHandler(async (req: Request, res: Response) => {
     const { formId } = req.params;
-    const userId = req.user?.id; 
+    const userId = req.user?.id;
 
     try {
         // Find the form by ID
@@ -721,7 +792,7 @@ const deleteForm = asyncHandler(async (req: Request, res: Response) => {
         }
 
         // Check if the user is the creator of the form
-        const isFormCreator = form.userId.equals(userId); 
+        const isFormCreator = form.userId.equals(userId);
         if (isFormCreator) {
             await Form.findByIdAndDelete(formId);
             return res.status(200).json(new ApiResponse(200, {}, 'Form deleted successfully'));
@@ -730,14 +801,14 @@ const deleteForm = asyncHandler(async (req: Request, res: Response) => {
         }
     } catch (error: any) {
         // Catch any errors and return a 500 Internal Server Error response
-        return res.status(500).json(new ApiError(500, "Error deleting form"));
+        return res.status(500).json(new ApiResponse(500, {}, "An error occurred while deleting the form. Please try again later or contact support if the issue persists."));
+
     }
 });
 
 
 const sendFormUrlMail = asyncHandler(async (req: Request, res: Response) => {
-    const {url, recipientEmail } = req.body; 
-
+    const { url, recipientEmail } = req.body;
     if (!recipientEmail || !url) {
         return res.status(400).json(new ApiError(400, "Recipient email and form URL are required."));
     }
@@ -752,9 +823,9 @@ const sendFormUrlMail = asyncHandler(async (req: Request, res: Response) => {
         return res.status(200).json({ message: "Email sent successfully!" }); // Successful response
     } catch (error: any) {
         // Catch any errors and return a 500 Internal Server Error response
-        return res.status(500).json(new ApiError(500, "Error sending email: " + error.message));
+        return res.status(500).json(new ApiResponse(500, {}, "We're currently experiencing issues sending the email. Please try sharing the url by copying and pasting it for now."));
     }
 });
 
 
-export { verifyOTP,sendFormUrlMail, getQuestionByID, deleteFormResponseById, submitFormResponse, getFormResponseById, registerUser, refreshAccessToken, loginUser, getCurrentUser, sendEmail, createNewForm, addQuestion, getAllForms, getFormByID, updateForm, deleteForm, deleteFormQuestion }
+export { verifyOTP, sendPasswordResetOTP, verifyOtpAndChangePassword, sendFormUrlMail, getQuestionByID, deleteFormResponseById, submitFormResponse, getFormResponseById, registerUser, refreshAccessToken, loginUser, getCurrentUser, sendEmail, createNewForm, addQuestion, getAllForms, getFormByID, updateForm, deleteForm, deleteFormQuestion }

@@ -12,7 +12,8 @@ export interface IUser extends Document {
     refreshToken?: string;
     createdAt: Date;  // Timestamp for creation
     updatedAt: Date;  // Timestamp for updates
-
+    resetPasswordOTP:string;
+    otpExpires:Date | null;
     isPasswordCorrect(password: string): Promise<boolean>;
     generateAccessToken(): string;
     generateRefreshToken(): string;
@@ -54,6 +55,14 @@ const userSchema = new Schema<IUser>(
         tokenVersion: {
             type: Number,
             default: 0,
+        },
+        resetPasswordOTP: {
+            type: String, // Store the OTP as a string
+            default: null,
+        },
+        otpExpires: {
+            type: Date || null, // Store the expiration time as a Date
+            default: null,
         },
     },
     { timestamps: true }

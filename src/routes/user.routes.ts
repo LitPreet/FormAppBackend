@@ -1,6 +1,5 @@
 import { Router } from "express";
-import { addQuestion, createNewForm, deleteForm, deleteFormQuestion, deleteFormResponseById, getAllForms, getCurrentUser, getFormByID, getFormResponseById, getQuestionByID, loginUser, refreshAccessToken, registerUser,  sendEmail,  sendFormUrlMail,  submitFormResponse,  updateForm,  verifyOTP } from "../controllers/user.controller";
-import { upload } from "../middlewares/multer.middleware";
+import { addQuestion, createNewForm, deleteForm, deleteFormQuestion, deleteFormResponseById, getAllForms, getCurrentUser, getFormByID, getFormResponseById, getQuestionByID, loginUser, refreshAccessToken, registerUser,  sendEmail,  sendFormUrlMail,  sendPasswordResetOTP,  submitFormResponse,  updateForm,  verifyOTP, verifyOtpAndChangePassword } from "../controllers/user.controller";
 import { verifyJWT } from "../middlewares/auth.middleware";
 
 const router = Router()
@@ -9,6 +8,8 @@ const router = Router()
 router.route("/register").post(registerUser)
 router.route("/verify-otp").post(verifyOTP)
 router.route("/login").post(loginUser)
+router.route("/send-password-reset-otp").post(sendPasswordResetOTP);
+router.route("/verify-otp-and-change-password").post(verifyOtpAndChangePassword);
 router.route("/send-email").post(sendEmail)
 router.route("/refresh-token").post(refreshAccessToken);
 
