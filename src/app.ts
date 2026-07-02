@@ -4,6 +4,11 @@ import cors from "cors";
 
 const app = express();
 
+app.use((req, res, next) => {
+  console.log('Method:', req.method, 'Origin:', req.headers.origin);
+  next();
+});
+
 app.use(cors({
     origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
     credentials: true
